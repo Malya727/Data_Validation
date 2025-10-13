@@ -1,0 +1,75 @@
+#!/bin/sh
+set -x
+# === Configuration ===
+CERT_FILE="/S4Drop/anaplan/ssl_cert/Anaplan_test_ca.pem"
+PRIVATE_KEY_FILE="/S4Drop/anaplan/ssl_cert/Anaplan_test_pkey.pem"
+PRIVATE_KEY_PASSPHRASE="AnaplanTest#1"  # Replace with secure method in production
+TEMP_DIR="/S4Drop/anaplan/temp/ana_temp"
+FLOW_ID="ac72a95201394ced8328c9a46245a9d7"
+AUTH_URL="https://auth.anaplan.com/token/authenticate"
+ 
+# === Generate base64-encoded certificate ===
+generate_encoded_cert() {
+    if [ -f "$CERT_FILE" ]; then
+        base64 -w 0 "$CERT_FILE"
+    else
+        echo "? Error: Certificate file not found at $CERT_FILE" >&2
+        exit 1
+    fi
+}
+ 
+# === Generate encodedData and encodedSignedData ===
+generate_encoded_strings() {
+    random_bytes=$(openssl rand 100)
+    echo -n "$random_bytes" > "$TEMP_DIR/random_bytes.bin"
+ 
+    signed_data=$(openssl dgst -sha512 -sign "$PRIVATE_KEY_FILE" \
+        -passin pass:"$PRIVATE_KEY_PASSPHRASE" "$TEMP_DIR/random_bytes.bin")
+ 
+    encoded_data=$(base64 -w 0 "$TEMP_DIR/random_bytes.bin")
+    encoded_signed_data=$(echo "$signed_data" | base64 -w 0)
+ 
+    rm -f "$TEMP_DIR/random_bytes.bin"
+    echo "$encoded_data $encoded_signed_data"
+}
+ 
+# === Main Execution ===
+echo "?? Generating base64-encoded CA certificate..."
+CA_CERTIFICATE=$(generate_encoded_cert)
+ 
+echo "?? Generating encodedData and encodedSignedData..."
+read ENCODED_DATA ENCODED_SIGNED_DATA <<< "$(generate_encoded_strings)"
+ 
+# === Create JSON payload ===
+payload=$(cat <<EOF
+{
+  "encodedData": "$ENCODED_DATA",
+  "encodedSignedData": "$ENCODED_SIGNED_DATA"
+}
+EOF
+)
+ 
+# === Authenticate and get token ===
+echo "?? Requesting authentication token..."
+response=$(curl -s -X POST "$AUTH_URL" \
+  -H "Authorization: $CA_CERTIFICATE" \
+  -H "Content-Type: application/json" \
+  -d "$payload")
+ 
+auth_token=$(echo "$response" | grep -oP '"tokenValue"\s*:\s*"\K[^"]+')
+ 
+if [ -z "$auth_token" ]; then
+    echo "? Failed to extract auth token. Response:"
+    echo "$response"
+    exit 1
+fi
+echo "? Auth token acquired."
+ 
+# === Trigger CloudWorks Integration ===
+echo "?? Triggering CloudWorks integration..."
+cloudworks_response=$(curl -s -X POST "https://api.cloudworks.anaplan.com/2/0/integrations/$FLOW_ID/run" \
+  -H "Authorization: AnaplanAuthToken $auth_token" \
+  -H "Content-Type: application/json")
+ 
+echo "?? CloudWorks triggered:"
+echo "$cloudworks_response"
