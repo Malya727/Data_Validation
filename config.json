@@ -1,0 +1,30 @@
+{
+  "profiles": {
+    "Prod_models_within_Same_WS": {
+      "description": "Configuration for the Development environment with Same WS.",
+      "export_action_names": "Model History Export",
+      "model_ids": [
+        {
+          "dev_model_id": "C354AF22A68848ACA6ECD2BB6BDE52FF",
+          "prod_model_ids": ["90A9000802BC42538D6EE44D0F0AB049", "E6A7230D26FD498C9A43FF42FAD55D30"]
+        }
+      ]
+    },
+    "prod_models_Within_different_WS": {
+      "description": "Configuration for different Workspace.",
+      "export_action_names": "Model History Export",
+      "model_ids": [
+        {
+          "dev_model_id": "C354AF22A68848ACA6ECD2BB6BDE52FF",
+          "prod_model_ids": ["90A9000802BC42538D6EE44D0F0AB049"]
+        },
+        {
+          "dev_model_id": "C354AF22A68848ACA6ECD2BB6BDE52FF",
+          "prod_model_ids": ["E6A7230D26FD498C9A43FF42FAD55D30"]
+        }
+		
+      ]
+    }
+
+  }
+}
